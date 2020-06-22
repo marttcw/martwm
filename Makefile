@@ -7,7 +7,7 @@ all:
 		-std=c99 -pedantic-errors -pedantic -Wall -msse2 -Wpointer-arith\
 		-Wstrict-prototypes\
 		-fomit-frame-pointer -ffast-math\
-		-flto -Os\
+		-g\
 		src/main.c
 
 #-flto -Os    | -g for debugging
