@@ -1,5 +1,11 @@
 # martwm
-martwm - Martin's Window Manager
+martwm - Martin's Window Manager for X made in C99 and xcb
+
+## Dependencies
+* [xcb](https://xcb.freedesktop.org/) - Usually part of any systems with Xorg/X11 installed
+  * xcb-randr
+  * xcb-keysyms
+  * xcb-ewmh
 
 ## Compile
 To compile the WM (as release build):
@@ -22,11 +28,13 @@ Uninstall:
 make uninstall
 ```
 
-## Mouse
+## Usages
+
+### Mouse
 * `Mod4-Mouse1` - Move window
 * `Mod4-Mouse3` - Resize window
 
-## Binds
+### Binds
 * `Mod4-Shift-e` - Exit WM
 * `Mod4-Shift-q` - Exit window
 * `Mod4-d` - dmenu
