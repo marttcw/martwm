@@ -60,6 +60,10 @@ static bool		bar_visible = true;
 static const uint32_t	bar_height = 15;
 static xcb_gcontext_t 	bar_gc;
 
+static uint32_t 		values[3];
+static xcb_get_geometry_reply_t	*geom;
+static bool			running = false;
+
 static xcb_gc_t
 gc_font_get(const char *font_name,
 		const uint32_t background_color,
@@ -362,6 +366,236 @@ update_window_title(const xcb_window_t window, const char *title)
 	strcpy(windows[index].name, title);
 }
 
+void
+new_window(xcb_generic_event_t *event)
+{
+	xcb_map_request_event_t *e = (xcb_map_request_event_t *) event;
+
+	// TODO: Make a lists of windows to keep from those windows
+
+	set_border(window, false);
+	window = e->window;
+	const uint32_t w_vals[1] = {
+		XCB_EVENT_MASK_ENTER_WINDOW |
+			XCB_EVENT_MASK_PROPERTY_CHANGE
+	};
+
+	xcb_change_window_attributes_checked(connection,
+			window,
+			XCB_CW_EVENT_MASK,
+			w_vals);
+
+	set_focus(window);
+	set_border(window, true);
+
+	// Add to list
+	windows[windows_len].id = window;
+	strcpy(windows[windows_len].name, get_name(window));
+	windows[windows_len].visible = true;
+
+	++windows_len;
+
+	update_bar();
+
+	printf("Mapping window: %s\n", get_name(window));
+
+	xcb_map_window(connection, window);
+	xcb_flush(connection);
+}
+
+void
+property_notify(xcb_generic_event_t *event)
+{
+	xcb_property_notify_event_t *e = (xcb_property_notify_event_t *) event;
+
+	//printf("Atom: %d == %d\n", e->atom, XCB_ATOM_WM_NAME);
+
+	if (e->atom == XCB_ATOM_WM_NAME)
+	{	// Window name changed
+		update_window_title(e->window, get_name(e->window));
+		update_bar();
+	}
+}
+
+void
+key_press(xcb_generic_event_t *event)
+{
+	xcb_key_press_event_t *e = (xcb_key_press_event_t *) event;
+
+	xcb_keysym_t keysym = xcb_key_symbols_get_keysym(syms, e->detail, 0);
+
+	//printf("keysym got: %d | q: %d\n", keysym, XK_q);
+	switch (keysym)
+	{
+	case XK_e:	// Exit window manager
+		//printf("state: %d\n", e->state);
+		if (e->state == (PRIMARY_MOD_KEY | XCB_MOD_MASK_SHIFT))
+		{
+			printf("Closing wm\n");
+			running = false;
+		}
+		break;
+	case XK_q:	// Kill window
+		if (e->state == (PRIMARY_MOD_KEY | XCB_MOD_MASK_SHIFT))
+		{
+			send_event(e->child, wm_atoms[WM_ATOMS_DELETE]);
+			update_bar();
+			//xcb_kill_client(connection, window);
+		}
+		break;
+	case XK_a:	// Raise window
+		set_border(window, false);
+		window = e->child;
+		values[0] = XCB_STACK_MODE_ABOVE;
+		xcb_configure_window(connection,
+				window,
+				XCB_CONFIG_WINDOW_STACK_MODE,
+				values);
+
+		set_focus(window);
+		set_border(window, true);
+		update_bar();
+		break;
+	case XK_d:	// dmenu
+		spawn("dmenu_run");
+		break;
+	case XK_b:
+		toggle_bar();
+		break;
+	}
+
+	xcb_flush(connection);
+}
+
+void
+button_press(xcb_generic_event_t *event)
+{
+	xcb_button_press_event_t *e = (xcb_button_press_event_t *) event;
+
+	// Ignore it (background)
+	if (e->child == 0)
+	{
+		return;
+	}
+
+	// Set border of old one as un-focused
+	set_border(window, false);
+
+	window = e->child;
+
+	// Raise window
+	values[0] = XCB_STACK_MODE_ABOVE;
+	xcb_configure_window(connection,
+			window,
+			XCB_CONFIG_WINDOW_STACK_MODE,
+			values);
+
+	set_border(window, true);
+	update_bar();
+
+	geom = xcb_get_geometry_reply(connection,
+			xcb_get_geometry(connection, window),
+			NULL);
+
+	switch (e->detail)
+	{
+	case 1: // Move
+		values[2] = 1;
+		xcb_warp_pointer(connection, XCB_NONE, window, 0, 0, 0, 0, 1, 1);
+		break;
+	case 3: // Resize
+		values[2] = 3;
+		xcb_warp_pointer(connection, XCB_NONE, window, 0, 0, 0, 0, geom->width, geom->height);
+		break;
+	}
+
+	free(geom);
+
+	xcb_grab_pointer(connection, 0, root,
+			XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_MOTION | XCB_EVENT_MASK_POINTER_MOTION_HINT,
+			XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC,
+			root, XCB_NONE, XCB_CURRENT_TIME);
+
+	xcb_flush(connection);
+}
+
+void
+enter_window(xcb_generic_event_t *event)
+{
+	xcb_enter_notify_event_t *e = (xcb_enter_notify_event_t *) event;
+
+	set_border(window, false);
+	window = e->event;
+	set_border(window, true);
+	update_bar();
+
+	xcb_flush(connection);
+}
+
+void
+mouse_motion(xcb_generic_event_t *event)
+{
+	xcb_query_pointer_reply_t *pointer = xcb_query_pointer_reply(
+			connection,
+			xcb_query_pointer(connection, root),
+			0);
+
+	if (!pointer)
+	{
+		return;
+	}
+
+	const int16_t pointer_x = pointer->root_x;
+	const int16_t pointer_y = pointer->root_y;
+
+	//printf("motion: %d %d\n", pointer_x, pointer_y);
+
+	switch (values[2])
+	{
+	case 1: // Move
+	{
+		geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, window), NULL);
+
+		values[0] = (pointer_x + geom->width > screen->width_in_pixels) ? (screen->width_in_pixels - geom->width) : pointer_x;
+		values[1] = (pointer_y + geom->height > screen->height_in_pixels) ? (screen->height_in_pixels - geom->height) : pointer_y;
+
+		free(geom);
+
+		//printf("Move value: %d %d\n", values[0], values[1]);
+		xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+		xcb_flush(connection);
+	} break;
+	case 3: // Resize
+	{
+		geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, window), NULL);
+
+		if ((pointer_x - geom->x) < MIN_WIDTH || (pointer_y - geom->y) < MIN_HEIGHT)
+		{
+			break;
+		}
+
+		values[0] = pointer_x - geom->x;
+		values[1] = pointer_y - geom->y;
+
+		free(geom);
+
+		xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+		xcb_flush(connection);
+	} break;
+	}
+
+	free(pointer);
+}
+
+void
+button_release(xcb_generic_event_t *event)
+{
+	(void) event;
+
+	xcb_ungrab_pointer(connection, XCB_CURRENT_TIME);
+	xcb_flush(connection);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -449,297 +683,36 @@ main(int argc, char **argv)
 		goto exit_wm;
 	}
 
-	xcb_generic_event_t 		*ev;
-	uint32_t 			values[3];
-	xcb_get_geometry_reply_t	*geom;
+	xcb_generic_event_t 	*ev = NULL;
+	void			(*events[XCB_NO_OPERATION])(xcb_generic_event_t *) = {
+		[XCB_MAP_REQUEST] = new_window,
+		[XCB_PROPERTY_NOTIFY] = property_notify,
+		[XCB_KEY_PRESS] = key_press,
+		[XCB_BUTTON_PRESS] = button_press,
+		[XCB_ENTER_NOTIFY] = enter_window,
+		[XCB_MOTION_NOTIFY] = mouse_motion,
+		[XCB_BUTTON_RELEASE] = button_release
 
-	while ((ev = xcb_wait_for_event(connection)))
+		//events[XCB_DESTROY_NOTIFY] = ,
+		//events[XCB_UNMAP_NOTIFY] = ,
+		//events[XCB_CONFIGURE_REQUEST] = ,
+		//events[XCB_CONFIGURE_NOTIFY] = ,
+		//events[XCB_CLIENT_MESSAGE] = ,
+	};
+
+	running = true;
+
+	while (running && (ev = xcb_wait_for_event(connection)))
 	{
-		switch (ev->response_type & ~0x80)
+		if (events[ev->response_type & ~0x80] != NULL)
 		{
-		case XCB_MAP_REQUEST:
-		{	// New window
-			xcb_map_request_event_t *e = (xcb_map_request_event_t *) ev;
-
-			// TODO: Make a lists of windows to keep from those windows
-
-			set_border(window, false);
-			window = e->window;
-			const uint32_t w_vals[1] = {
-				XCB_EVENT_MASK_ENTER_WINDOW |
-					XCB_EVENT_MASK_PROPERTY_CHANGE
-			};
-
-			xcb_change_window_attributes_checked(connection,
-					window,
-					XCB_CW_EVENT_MASK,
-					w_vals);
-
-			set_focus(window);
-			set_border(window, true);
-
-			// Add to list
-			windows[windows_len].id = window;
-			strcpy(windows[windows_len].name, get_name(window));
-			windows[windows_len].visible = true;
-
-			++windows_len;
-
-			update_bar();
-
-			printf("Mapping window: %s\n", get_name(window));
-
-			xcb_map_window(connection, window);
-			xcb_flush(connection);
-		} break;
-		case XCB_DESTROY_NOTIFY:
-		{
-			printf("Window destroyed\n");
-		} break;
-		case XCB_UNMAP_NOTIFY:
-		{
-			printf("Window unmapped\n");
-		} break;
-		case XCB_CONFIGURE_REQUEST:
-		{
-			//printf("Configure request\n");
-		} break;
-		case XCB_CONFIGURE_NOTIFY:
-		{
-			//printf("Configure notify\n");
-		} break;
-		case XCB_PROPERTY_NOTIFY:
-		{
-			//printf("Property notify\n");
-			xcb_property_notify_event_t *e = (xcb_property_notify_event_t *) ev;
-
-			//printf("Atom: %d == %d\n", e->atom, XCB_ATOM_WM_NAME);
-
-			if (e->atom == XCB_ATOM_WM_NAME)
-			{	// Window name changed
-				update_window_title(e->window, get_name(e->window));
-				update_bar();
-			}
-		} break;
-		case XCB_CLIENT_MESSAGE:
-		{
-			// TODO
-			printf("Client message\n");
-
-#if 0
-			xcb_client_message_event_t *e = (xcb_client_message_event_t *) ev;
-			const xcb_window_t window = e->window;
-			const xcb_atom_t atom = e->type;
-			int32_t atom_index = -1;
-
-			for (uint32_t i = 0; i < WM_ATOMS_ALL; ++i)
-			{
-				if (atom == wm_atoms[i])
-				{
-					atom_index = i;
-					break;
-				}
-			}
-
-			// Skip
-			if (atom_index == -1)
-			{
-				break;
-			}
-
-			printf("Atom index: %d\n", atom_index);
-
-			update_bar();
-
-			switch (e->format)
-			{
-			case 8:
-				e->data.data8;
-				break;
-			case 16:
-				e->data.data16;
-				break;
-			case 32:
-				e->data.data32;
-				break;
-			}
-#endif
-		} break;
-		case XCB_KEY_PRESS:
-		{
-			xcb_key_press_event_t *e = (xcb_key_press_event_t *) ev;
-
-			xcb_keysym_t keysym = xcb_key_symbols_get_keysym(syms, e->detail, 0);
-
-			//printf("keysym got: %d | q: %d\n", keysym, XK_q);
-			switch (keysym)
-			{
-			case XK_e:	// Exit window manager
-				//printf("state: %d\n", e->state);
-				if (e->state == (PRIMARY_MOD_KEY | XCB_MOD_MASK_SHIFT))
-				{
-					printf("Closing wm\n");
-					goto exit_wm;
-				}
-				break;
-			case XK_q:	// Kill window
-				if (e->state == (PRIMARY_MOD_KEY | XCB_MOD_MASK_SHIFT))
-				{
-					send_event(e->child, wm_atoms[WM_ATOMS_DELETE]);
-					update_bar();
-					//xcb_kill_client(connection, window);
-				}
-				break;
-			case XK_a:	// Raise window
-				set_border(window, false);
-				window = e->child;
-				values[0] = XCB_STACK_MODE_ABOVE;
-				xcb_configure_window(connection,
-						window,
-						XCB_CONFIG_WINDOW_STACK_MODE,
-						values);
-
-				set_focus(window);
-				set_border(window, true);
-				update_bar();
-				break;
-			case XK_d:	// dmenu
-				spawn("dmenu_run");
-				break;
-			case XK_b:
-				toggle_bar();
-				break;
-			}
-
-			xcb_flush(connection);
-		} break;
-		case XCB_BUTTON_PRESS:
-		{
-			xcb_button_press_event_t *e = (xcb_button_press_event_t *) ev;
-
-			// Ignore it (background)
-			if (e->child == 0)
-			{
-				break;
-			}
-
-			// Set border of old one as un-focused
-			set_border(window, false);
-
-			window = e->child;
-
-			// Raise window
-			values[0] = XCB_STACK_MODE_ABOVE;
-			xcb_configure_window(connection,
-					window,
-					XCB_CONFIG_WINDOW_STACK_MODE,
-					values);
-
-			set_border(window, true);
-			update_bar();
-
-			geom = xcb_get_geometry_reply(connection,
-					xcb_get_geometry(connection, window),
-					NULL);
-
-			switch (e->detail)
-			{
-			case 1: // Move
-				values[2] = 1;
-				xcb_warp_pointer(connection, XCB_NONE, window, 0, 0, 0, 0, 1, 1);
-				break;
-			case 3: // Resize
-				values[2] = 3;
-				xcb_warp_pointer(connection, XCB_NONE, window, 0, 0, 0, 0, geom->width, geom->height);
-				break;
-			}
-
-			free(geom);
-
-			xcb_grab_pointer(connection, 0, root,
-					XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_MOTION | XCB_EVENT_MASK_POINTER_MOTION_HINT,
-					XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC,
-					root, XCB_NONE, XCB_CURRENT_TIME);
-
-			xcb_flush(connection);
-		} break;
-		case XCB_ENTER_NOTIFY:
-		{
-			xcb_enter_notify_event_t *e = (xcb_enter_notify_event_t *) ev;
-
-			set_border(window, false);
-			window = e->event;
-			set_border(window, true);
-			update_bar();
-
-			xcb_flush(connection);
-		} break;
-		case XCB_MOTION_NOTIFY:
-		{
-			xcb_query_pointer_reply_t *pointer = xcb_query_pointer_reply(
-					connection,
-					xcb_query_pointer(connection, root),
-					0);
-
-			if (!pointer)
-			{
-				break;
-			}
-
-			const int16_t pointer_x = pointer->root_x;
-			const int16_t pointer_y = pointer->root_y;
-
-			//printf("motion: %d %d\n", pointer_x, pointer_y);
-
-			switch (values[2])
-			{
-			case 1: // Move
-			{
-				geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, window), NULL);
-
-				values[0] = (pointer_x + geom->width > screen->width_in_pixels) ? (screen->width_in_pixels - geom->width) : pointer_x;
-				values[1] = (pointer_y + geom->height > screen->height_in_pixels) ? (screen->height_in_pixels - geom->height) : pointer_y;
-
-				free(geom);
-
-				//printf("Move value: %d %d\n", values[0], values[1]);
-				xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
-				xcb_flush(connection);
-			} break;
-			case 3: // Resize
-			{
-				geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, window), NULL);
-
-				if ((pointer_x - geom->x) < MIN_WIDTH || (pointer_y - geom->y) < MIN_HEIGHT)
-				{
-					break;
-				}
-
-				values[0] = pointer_x - geom->x;
-				values[1] = pointer_y - geom->y;
-
-				free(geom);
-
-				xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-				xcb_flush(connection);
-			} break;
-			}
-
-			free(pointer);
-		} break;
-		case XCB_BUTTON_RELEASE:
-		{
-			xcb_ungrab_pointer(connection, XCB_CURRENT_TIME);
-			xcb_flush(connection);
-		} break;
+			events[ev->response_type & ~0x80](ev);
 		}
 
 		free(ev);
 	}
 
 exit_wm:
-	if (ev) free(ev);
-
 	xcb_key_symbols_free(syms);
 	xcb_set_input_focus(connection, XCB_NONE,
 			XCB_INPUT_FOCUS_POINTER_ROOT,

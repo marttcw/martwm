@@ -11,6 +11,7 @@ make
 * `Mod4-Shift-q` - Exit window
 * `Mod4-d` - dmenu
 * `Mod4-a` - Raise window
+* `Mod4-b` - Toggle bar
 
 ## Run for testing
 ```
