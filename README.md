@@ -14,7 +14,7 @@ make
 
 ## Run for testing
 ```
-Xephyr -br -ac -noreset -screen 800x600 :1 &
+Xephyr -br -ac -noreset -screen 1024x768 :1 &
 DISPLAY=:1 ./mmdtwm &
 ```
 
