@@ -36,6 +36,6 @@ make uninstall
 ## Run for testing
 ```
 Xephyr -br -ac -noreset -screen 1024x768 :1 &
-DISPLAY=:1 ./mmdtwm &
+DISPLAY=:1 ./martwm &
 ```
 

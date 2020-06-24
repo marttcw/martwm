@@ -6,7 +6,9 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 #include <xcb/randr.h>
+
 #include <X11/keysym.h>
+#include <X11/cursorfont.h>
 
 #include <sys/types.h> 
 #include <unistd.h>
@@ -19,14 +21,16 @@ const int32_t MIN_HEIGHT = 20;
 #define PRIMARY_MOD_KEY XCB_MOD_MASK_4
 
 #define CONFIG_COLOR_FOCUS 	0xFF9933
-#define CONFIG_COLOR_UNFOCUS	0x111111
+#define CONFIG_COLOR_UNFOCUS	0x777777
 #define CONFIG_BAR_BORDER	0
 #define CONFIG_COLOR_BAR	0xFFFFFF
 #define CONFIG_COLOR_BAR_BORDER	0xFFFFFF
 #define CONFIG_COLOR_BAR_TEXT	0x000000
 #define DEFAULT_FONT		"fixed"
+#define CONFIG_BORDER_WIDTH	3
 
 #define WM_MAX_WINDOWS 64
+#define WM_MAX_MONITORS 16
 
 enum {
 	WM_ATOMS_PROTOCOLS, 
@@ -42,6 +46,10 @@ typedef struct {
 	char		name[64];
 	bool		visible;
 } wm_window_t;
+
+typedef struct {
+	xcb_rectangle_t rect;
+} wm_monitor_t;
 
 static xcb_connection_t *connection = NULL;
 static xcb_drawable_t 	root;
@@ -63,6 +71,9 @@ static xcb_gcontext_t 	bar_gc;
 static uint32_t 		values[3];
 static xcb_get_geometry_reply_t	*geom;
 static bool			running = false;
+
+static wm_monitor_t	monitors[WM_MAX_MONITORS] = { 0 };
+static uint32_t		monitors_len = 0;
 
 static xcb_gc_t
 gc_font_get(const char *font_name,
@@ -185,7 +196,7 @@ set_border(const xcb_window_t window, const bool focus)
 	xcb_configure_window(connection,
 			window,
 			XCB_CONFIG_WINDOW_BORDER_WIDTH,
-			(uint32_t [1]) { 3 });
+			(uint32_t [1]) { CONFIG_BORDER_WIDTH });
 
 	uint32_t color = (focus) ? CONFIG_COLOR_FOCUS : CONFIG_COLOR_UNFOCUS;
 
@@ -287,7 +298,7 @@ setup_bar(void)
 			bar,
 			root,
 			0, 0,
-			1920, bar_height,	// TODO: Use randr
+			monitors[0].rect.width, bar_height,
 			CONFIG_BAR_BORDER,
 			XCB_WINDOW_CLASS_INPUT_OUTPUT,
 			screen->root_visual,
@@ -323,7 +334,7 @@ update_bar(void)
 			1, (xcb_rectangle_t [1]) { {
 				.x = 0,
 				.y = 0,
-				.width = 1920, // TODO: randr
+				.width = monitors[0].rect.width,
 				.height = bar_height
 			} });
 
@@ -352,6 +363,46 @@ toggle_bar(void)
 
 	xcb_toggle_window(connection, bar);
 	update_bar();
+}
+
+xcb_cursor_t
+cursor_get(const uint32_t cursor_id)
+{
+	xcb_font_t cursor_font = xcb_generate_id(connection);
+	xcb_open_font(connection, cursor_font, 6, "cursor");
+
+	xcb_cursor_t cursor = xcb_generate_id(connection);
+	xcb_create_glyph_cursor(connection,
+			cursor,
+			cursor_font,
+			cursor_font,
+			cursor_id,
+			cursor_id + 1,
+			0x3232, 0x3232, 0x3232, 0xeeee, 0xeeee, 0xeeec);
+
+	return cursor;
+}
+
+void
+cursor_set(const xcb_cursor_t cursor, const xcb_window_t window)
+{
+	xcb_change_window_attributes(connection, window,
+			XCB_CW_CURSOR,
+			(uint32_t []) { cursor });
+}
+
+void
+cursor_free(xcb_cursor_t cursor)
+{
+	xcb_free_cursor(connection, cursor);
+}
+
+void
+cursor_change(const xcb_window_t window, const uint32_t cursor_id)
+{
+	xcb_cursor_t cursor = cursor_get(cursor_id);
+	cursor_set(cursor, window);
+	cursor_free(cursor);
 }
 
 void
@@ -502,10 +553,12 @@ button_press(xcb_generic_event_t *event)
 	case 1: // Move
 		values[2] = 1;
 		xcb_warp_pointer(connection, XCB_NONE, window, 0, 0, 0, 0, 1, 1);
+		cursor_change(window, XC_fleur);
 		break;
 	case 3: // Resize
 		values[2] = 3;
 		xcb_warp_pointer(connection, XCB_NONE, window, 0, 0, 0, 0, geom->width, geom->height);
+		cursor_change(window, XC_sizing);
 		break;
 	}
 
@@ -596,6 +649,101 @@ button_release(xcb_generic_event_t *event)
 	xcb_flush(connection);
 }
 
+void
+setup_randr(void)
+{
+	/*
+	 * Setup randr by querying its version
+	 */
+
+	xcb_randr_query_version_cookie_t version_cookie = xcb_randr_query_version(
+			connection,
+			XCB_RANDR_MAJOR_VERSION,
+			XCB_RANDR_MINOR_VERSION);
+
+	xcb_randr_query_version_reply_t *version_reply = xcb_randr_query_version_reply(
+			connection,
+			version_cookie,
+			NULL);
+
+	if (version_reply)
+	{
+		free(version_reply);
+	}
+
+	/*
+	 * Get screen resources
+	 */
+
+	xcb_randr_get_screen_resources_cookie_t screen_res_cookie = xcb_randr_get_screen_resources(
+			connection,
+			root);
+
+	xcb_randr_get_screen_resources_reply_t *screen_res_reply = xcb_randr_get_screen_resources_reply(
+			connection,
+			screen_res_cookie,
+			NULL);
+
+	if (!screen_res_reply)
+	{
+		return;
+	}
+
+	/*
+	 * CRTC
+	 */
+
+	const uint32_t crtcs_len = xcb_randr_get_screen_resources_crtcs_length(screen_res_reply);
+	xcb_randr_crtc_t *crtcs = xcb_randr_get_screen_resources_crtcs(screen_res_reply);
+
+	/*
+	 * Send request to X server about crtc information
+	 */
+	xcb_randr_get_crtc_info_cookie_t crtcs_cookie[crtcs_len];
+
+	for (uint32_t i = 0; i < crtcs_len; ++i)
+	{
+		crtcs_cookie[i] = xcb_randr_get_crtc_info(connection, crtcs[i], 0);
+	}
+
+	/*
+	 * Recieve reply from X server about crtc information
+	 */
+	xcb_randr_get_crtc_info_reply_t *crtcs_reply[crtcs_len];
+
+	for (uint32_t i = 0; i < crtcs_len; ++i)
+	{
+		crtcs_reply[i] = xcb_randr_get_crtc_info_reply(connection, crtcs_cookie[i], 0);
+
+		if (!crtcs_reply[i])
+		{
+			continue;
+		}
+
+		if (crtcs_reply[i]->x != 0 || crtcs_reply[i]->y != 0 ||
+				crtcs_reply[i]->width != 0 || crtcs_reply[i]->height != 0)
+		{
+			monitors[monitors_len].rect.x = crtcs_reply[i]->x;
+			monitors[monitors_len].rect.y = crtcs_reply[i]->y;
+			monitors[monitors_len].rect.width = crtcs_reply[i]->width;
+			monitors[monitors_len].rect.height = crtcs_reply[i]->height;
+
+			printf("Monitor: %d: (%d,%d) %d x %d\n",
+					monitors_len,
+					monitors[monitors_len].rect.x,
+					monitors[monitors_len].rect.y,
+					monitors[monitors_len].rect.width,
+					monitors[monitors_len].rect.height);
+
+			++monitors_len;
+		}
+
+		free(crtcs_reply[i]);
+	}
+
+	free(screen_res_reply);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -640,6 +788,8 @@ main(int argc, char **argv)
 		}
 	}
 
+	setup_randr();
+
 	/*
 	 * Keycodes
 	 */
@@ -659,6 +809,9 @@ main(int argc, char **argv)
 			XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE,
 			XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC,
 			root, XCB_NONE, 3, PRIMARY_MOD_KEY);
+
+	// Change root cursor
+	cursor_change(root, XC_left_ptr);
 
 	setup_overview();
 	setup_bar();
