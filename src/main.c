@@ -602,7 +602,7 @@ main(int argc, char **argv)
 	(void) argc;
 	(void) argv;
 
-	printf("Running mmdtwm\n");
+	printf("Running martwm\n");
 
 	connection = xcb_connect(NULL, NULL);
 	if (xcb_connection_has_error(connection))
@@ -723,7 +723,7 @@ exit_wm:
 
 	xcb_flush(connection);
 	xcb_disconnect(connection);
-	printf("Closing mmdtwm\n");
+	printf("Closing martwm\n");
 
 	return 0;
 }

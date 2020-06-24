@@ -1,5 +1,5 @@
-# mmdtwm
-mmdwm - Martin's Mouse Driven Tiling Window Manager
+# martwm
+martwm - Martin's Window Manager
 
 ## Compile
 To compile the WM (as release build):

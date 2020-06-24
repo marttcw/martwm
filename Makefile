@@ -1,6 +1,6 @@
-# mmdtwm - Martin's Mouse Driven Tiling Window Manager
+# martwm - Martin's Window Manager
 
-NAME = mmdtwm
+NAME = martwm
 SRC = src/main.c
 CC = cc
 VERSION = PRE-ALPHA-0.1
