@@ -2,9 +2,29 @@
 mmdwm - Martin's Mouse Driven Tiling Window Manager
 
 ## Compile
+To compile the WM (as release build):
 ```
 make
 ```
+
+To compile the WM as debug build:
+```
+make debug
+```
+
+Install the WM:
+```
+make clean install
+```
+
+Uninstall:
+```
+make uninstall
+```
+
+## Mouse
+* `Mod4-Mouse1` - Move window
+* `Mod4-Mouse3` - Resize window
 
 ## Binds
 * `Mod4-Shift-e` - Exit WM
