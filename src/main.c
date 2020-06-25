@@ -10,6 +10,10 @@
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
 
+#include <cairo/cairo-xcb.h>
+#include <pango/pangocairo.h>
+#include <fontconfig/fontconfig.h>
+
 #include <sys/types.h> 
 #include <unistd.h>
 
@@ -20,14 +24,19 @@ const int32_t MIN_HEIGHT = 20;
 // Mask 4 = Super key
 #define PRIMARY_MOD_KEY XCB_MOD_MASK_4
 
-#define CONFIG_COLOR_FOCUS 	0xFF9933
-#define CONFIG_COLOR_UNFOCUS	0x777777
 #define CONFIG_BAR_BORDER	0
 #define CONFIG_COLOR_BAR	0xFFFFFF
 #define CONFIG_COLOR_BAR_BORDER	0xFFFFFF
 #define CONFIG_COLOR_BAR_TEXT	0x000000
-#define DEFAULT_FONT		"fixed"
 #define CONFIG_BORDER_WIDTH	3
+#define CONFIG_FONT		"Monospace 10"
+#define CONFIG_BAR_HEIGHT	18
+#define CONFIG_FRAME_BAR	18
+
+#define CONFIG_COLOR_FRAME_BACK_FOCUS	0x666699
+#define CONFIG_COLOR_FRAME_BACK_UNFOCUS	0x888888
+#define CONFIG_COLOR_FRAME_BORDER_FOCUS 	0xFF9933
+#define CONFIG_COLOR_FRAME_BORDER_UNFOCUS	0x777777
 
 #define WM_MAX_WINDOWS 64
 #define WM_MAX_MONITORS 16
@@ -42,6 +51,7 @@ enum {
 };
 
 typedef struct {
+	xcb_window_t	frame;
 	xcb_window_t 	id;
 	char		name[64];
 	bool		visible;
@@ -58,14 +68,15 @@ static xcb_atom_t 	wm_atoms[WM_ATOMS_ALL];
 static wm_window_t 	windows[WM_MAX_WINDOWS] = { 0 };
 static uint32_t		windows_len = 0;
 static xcb_screen_t 	*screen;
-static xcb_drawable_t 	window;
+
+static wm_window_t	current = { 0 };
 
 static xcb_window_t	overview;
 
 // Bar
 static xcb_window_t	bar;
 static bool		bar_visible = true;
-static const uint32_t	bar_height = 15;
+static const uint32_t	bar_height = CONFIG_BAR_HEIGHT;
 static xcb_gcontext_t 	bar_gc;
 
 static uint32_t 		values[3];
@@ -75,92 +86,84 @@ static bool			running = false;
 static wm_monitor_t	monitors[WM_MAX_MONITORS] = { 0 };
 static uint32_t		monitors_len = 0;
 
-static xcb_gc_t
-gc_font_get(const char *font_name,
-		const uint32_t background_color,
-		const uint32_t foreground_color,
-		const xcb_window_t window)
+static xcb_visualtype_t	*visual_type = NULL;
+
+static cairo_surface_t 	*cr_surface = NULL;
+static cairo_t		*cr = NULL;
+static PangoLayout 	*pa_layout = NULL;
+
+void
+text_render_setup(void)
 {
-	xcb_font_t font = xcb_generate_id(connection);
-	xcb_void_cookie_t cookie_font = xcb_open_font_checked(connection,
-			font, strlen(font_name), font_name);
-	xcb_generic_error_t *error = xcb_request_check(connection, cookie_font);
-	if (error)
-	{
-		fprintf(stderr, "ERROR: Cannot open font: %d\n", error->error_code);
-		return -1;
-	}
+	cr_surface = cairo_xcb_surface_create(connection,
+			root, visual_type,
+			screen->width_in_pixels,
+			screen->height_in_pixels);
 
-	xcb_gcontext_t gc = xcb_generate_id(connection);
-	uint32_t mask = XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT;
-	uint32_t values[3] = {
-		[0] = foreground_color,
-		[1] = background_color,
-		[2] = font
-	};
-	xcb_void_cookie_t cookie_gc = xcb_create_gc_checked(
-			connection,
-			gc,
-			window,
-			mask,
-			values);
+	cr = cairo_create(cr_surface);
+	cairo_paint(cr);
 
-	error = xcb_request_check(connection, cookie_gc);
-	if (error)
-	{
-		fprintf(stderr, "ERROR: Cannot create gc: %d\n", error->error_code);
-		return -1;
-	}
-
-	cookie_font = xcb_close_font_checked(connection, font);
-	error = xcb_request_check(connection, cookie_font);
-	if (error)
-	{
-		fprintf(stderr, "ERROR: Cannot close font: %d\n", error->error_code);
-		return -1;
-	}
-
-	return gc;
+	pa_layout = pango_cairo_create_layout(cr);
+	PangoFontDescription *pa_desc = pango_font_description_from_string(CONFIG_FONT);
+	pango_layout_set_font_description(pa_layout, pa_desc);
+	pango_font_description_free(pa_desc);
+	pa_desc = NULL;
 }
 
 void
-text_draw(const xcb_window_t window,
-		const int16_t x,
-		const int16_t y,
-		const char *str,
-		const uint32_t background_color,
-		const uint32_t foreground_color)
+text_render_draw(const xcb_window_t window,
+		const char *text,
+		const double x,
+		const double y,
+		const double r,
+		const double g,
+		const double b,
+		const double a)
 {
-	const uint8_t length = strlen(str);
-
-	xcb_gcontext_t gc = gc_font_get(DEFAULT_FONT, background_color,
-			foreground_color, window);
-	if (gc == -1)
-	{
-		exit(-1);
-	}
-
-	xcb_void_cookie_t cookie_text = xcb_image_text_8_checked(
+	static int32_t pa_height = 0;
+	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(
 			connection,
-			length,
+			window);
+
+	xcb_get_geometry_reply_t *geom_reply = xcb_get_geometry_reply(
+			connection,
+			geom_cookie,
+			NULL);
+
+	if (!geom_reply)
+	{
+		fprintf(stderr, "ERROR: Cannot get geometry of window"
+				" %d.\n", window);
+		return;
+	}
+
+	cairo_surface_flush(cr_surface);
+	cairo_xcb_surface_set_drawable(cr_surface,
 			window,
-			gc,
-			x, y, str);
+			geom_reply->width,
+			geom_reply->height);
 
-	xcb_generic_error_t *error = xcb_request_check(connection, cookie_text);
-	if (error)
-	{
-		fprintf(stderr, "ERROR: Cannot paste text: %d\n", error->error_code);
-		exit(-1);
-	}
+	free(geom_reply);
 
-	xcb_void_cookie_t cookie_gc = xcb_free_gc(connection, gc);
-	error = xcb_request_check(connection, cookie_gc);
-	if (error)
-	{
-		fprintf(stderr, "ERROR: Cannot free gc: %d\n", error->error_code);
-		exit(-1);
-	}
+	pango_layout_set_text(pa_layout, text, -1);
+	cairo_set_source_rgba(cr, r, g, b, a);
+	cairo_move_to(cr, x, y);
+	pango_cairo_update_layout(cr, pa_layout);
+	pango_layout_get_size(pa_layout, NULL, &pa_height);
+	pango_cairo_show_layout(cr, pa_layout);
+
+	cairo_surface_flush(cr_surface);
+}
+
+void
+text_render_destroy(void)
+{
+	g_object_unref(pa_layout);
+	pa_layout = NULL;
+	cairo_destroy(cr);
+	cr = NULL;
+	cairo_surface_destroy(cr_surface);
+	cr_surface = NULL;
 }
 
 void
@@ -193,12 +196,14 @@ send_event(const xcb_window_t window, const xcb_atom_t proto)
 void
 set_border(const xcb_window_t window, const bool focus)
 {
+#if 0
 	xcb_configure_window(connection,
 			window,
 			XCB_CONFIG_WINDOW_BORDER_WIDTH,
 			(uint32_t [1]) { CONFIG_BORDER_WIDTH });
+#endif
 
-	uint32_t color = (focus) ? CONFIG_COLOR_FOCUS : CONFIG_COLOR_UNFOCUS;
+	uint32_t color = (focus) ? CONFIG_COLOR_FRAME_BORDER_FOCUS : CONFIG_COLOR_FRAME_BORDER_UNFOCUS;
 
 	xcb_change_window_attributes(connection,
 			window,
@@ -338,15 +343,15 @@ update_bar(void)
 				.height = bar_height
 			} });
 
-	int32_t index = find_window(window);
+	int32_t index = find_window(current.id);
 	if (index == -1)
 	{
 		return;
 	}
 
-	text_draw(bar, 5, bar_height - 3, windows[index].name,
-			CONFIG_COLOR_BAR,
-			CONFIG_COLOR_BAR_TEXT);
+	//printf("text_render_draw: %s\n", windows[index].name);
+	text_render_draw(bar, windows[index].name, 5, 0, 
+			0.0, 0.0, 0.0, 1.0);
 }
 
 void
@@ -406,7 +411,7 @@ cursor_change(const xcb_window_t window, const uint32_t cursor_id)
 }
 
 void
-update_window_title(const xcb_window_t window, const char *title)
+update_window_title(const xcb_window_t window)
 {
 	int32_t index = find_window(window);
 	if (index == -1)
@@ -414,7 +419,102 @@ update_window_title(const xcb_window_t window, const char *title)
 		return;
 	}
 
-	strcpy(windows[index].name, title);
+	strcpy(windows[index].name, get_name(window));
+}
+
+xcb_window_t
+frame_find_child(const xcb_window_t frame)
+{
+	for (uint32_t i = 0; i < windows_len; ++i)
+	{
+		if (windows[i].frame == frame)
+		{
+			return windows[i].id;
+		}
+	}
+
+	return 0;
+}
+
+xcb_window_t
+child_find_frame(const xcb_window_t child)
+{
+	for (uint32_t i = 0; i < windows_len; ++i)
+	{
+		if (windows[i].id == child)
+		{
+			return windows[i].frame;
+		}
+	}
+
+	return 0;
+}
+
+void
+update_current(const xcb_window_t frame)
+{
+	const xcb_window_t child = frame_find_child(frame);
+	if (child == 0)
+	{
+		return;
+	}
+
+	set_border(current.frame, false);
+
+	current.frame = frame;
+	current.id = child;
+
+	set_border(current.frame, true);
+	set_focus(current.frame);
+}
+
+void
+frame_update_size(const xcb_window_t frame,
+		const uint32_t width,
+		const uint32_t height)
+{
+	const xcb_window_t child_win = frame_find_child(frame);
+	if (child_win == 0)
+	{
+		return;
+	}
+
+	xcb_configure_window(connection,
+			frame,
+			XCB_CONFIG_WINDOW_WIDTH |
+			XCB_CONFIG_WINDOW_HEIGHT,
+			(uint32_t []) {
+				width, height
+			});
+
+	xcb_configure_window(connection,
+			child_win,
+			XCB_CONFIG_WINDOW_WIDTH |
+			XCB_CONFIG_WINDOW_HEIGHT,
+			(uint32_t []) {
+				width, height - CONFIG_FRAME_BAR
+			});
+
+	// Clear old render
+	xcb_gcontext_t frame_gc = xcb_generate_id(connection);
+
+	xcb_create_gc(connection, frame_gc, frame,
+			XCB_GC_FOREGROUND | XCB_GC_GRAPHICS_EXPOSURES,
+			(uint32_t [2]) {
+				[0] = CONFIG_COLOR_FRAME_BACK_FOCUS,
+				[1] = 0
+			});
+
+	xcb_poly_fill_rectangle(connection,
+			frame, frame_gc,
+			1, (xcb_rectangle_t [1]) { {
+				.x = 0,
+				.y = 0,
+				.width = width,
+				.height = height
+			} });
+
+	xcb_free_gc(connection, frame_gc);
 }
 
 void
@@ -422,35 +522,57 @@ new_window(xcb_generic_event_t *event)
 {
 	xcb_map_request_event_t *e = (xcb_map_request_event_t *) event;
 
-	// TODO: Make a lists of windows to keep from those windows
+	printf("Map request\n");
 
-	set_border(window, false);
-	window = e->window;
-	const uint32_t w_vals[1] = {
-		XCB_EVENT_MASK_ENTER_WINDOW |
-			XCB_EVENT_MASK_PROPERTY_CHANGE
-	};
+	xcb_window_t frame = xcb_generate_id(connection);
+	xcb_get_geometry_reply_t *win_geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, e->window), NULL);
+
+	xcb_create_window(connection,
+			0,
+			frame,
+			root,
+			0, 0,
+			win_geom->width, win_geom->height + CONFIG_FRAME_BAR,
+			2,
+			XCB_WINDOW_CLASS_INPUT_OUTPUT,
+			screen->root_visual,
+				XCB_CW_BACK_PIXEL |
+				XCB_CW_BORDER_PIXEL |
+				XCB_CW_OVERRIDE_REDIRECT |
+				XCB_CW_EVENT_MASK,
+			(uint32_t []) {
+				CONFIG_COLOR_FRAME_BACK_FOCUS,
+				CONFIG_COLOR_FRAME_BORDER_FOCUS,
+				true,
+				XCB_EVENT_MASK_BUTTON_PRESS |
+					XCB_EVENT_MASK_EXPOSURE |
+					XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT}
+			);
 
 	xcb_change_window_attributes_checked(connection,
-			window,
+			e->window,
 			XCB_CW_EVENT_MASK,
-			w_vals);
+			(uint32_t [1]) {XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT});
 
-	set_focus(window);
-	set_border(window, true);
+	xcb_reparent_window(connection, e->window, frame, 0, CONFIG_FRAME_BAR);
+
+	printf("New window for: %d | frame: %d\n", e->window, frame);
 
 	// Add to list
-	windows[windows_len].id = window;
-	strcpy(windows[windows_len].name, get_name(window));
+	windows[windows_len].id = e->window;
+	windows[windows_len].frame = frame;
+	strcpy(windows[windows_len].name, get_name(e->window));
 	windows[windows_len].visible = true;
 
 	++windows_len;
 
+	update_current(frame);
 	update_bar();
 
-	printf("Mapping window: %s\n", get_name(window));
+	printf("Mapping window: %s\n", get_name(e->window));
 
-	xcb_map_window(connection, window);
+	xcb_map_window(connection, e->window);
+	xcb_map_window(connection, frame);
 	xcb_flush(connection);
 }
 
@@ -463,9 +585,23 @@ property_notify(xcb_generic_event_t *event)
 
 	if (e->atom == XCB_ATOM_WM_NAME)
 	{	// Window name changed
-		update_window_title(e->window, get_name(e->window));
+		update_window_title(e->window);
 		update_bar();
 	}
+
+	xcb_flush(connection);
+}
+
+void
+frame_kill(const xcb_window_t frame)
+{
+	send_event(frame_find_child(frame), wm_atoms[WM_ATOMS_DELETE]);
+	xcb_unmap_window(connection, frame);
+
+	current.id = root;
+	current.frame = root;
+	memset(current.name, '\0', sizeof(current.name));
+	current.visible = false;
 }
 
 void
@@ -489,22 +625,18 @@ key_press(xcb_generic_event_t *event)
 	case XK_q:	// Kill window
 		if (e->state == (PRIMARY_MOD_KEY | XCB_MOD_MASK_SHIFT))
 		{
-			send_event(e->child, wm_atoms[WM_ATOMS_DELETE]);
+			frame_kill(e->child);
 			update_bar();
 			//xcb_kill_client(connection, window);
 		}
 		break;
 	case XK_a:	// Raise window
-		set_border(window, false);
-		window = e->child;
+		update_current(e->child);
 		values[0] = XCB_STACK_MODE_ABOVE;
 		xcb_configure_window(connection,
-				window,
+				e->child,
 				XCB_CONFIG_WINDOW_STACK_MODE,
 				values);
-
-		set_focus(window);
-		set_border(window, true);
 		update_bar();
 		break;
 	case XK_d:	// dmenu
@@ -530,9 +662,8 @@ button_press(xcb_generic_event_t *event)
 	}
 
 	// Set border of old one as un-focused
-	set_border(window, false);
-
-	window = e->child;
+	const xcb_window_t window = e->child;
+	update_current(window);
 
 	// Raise window
 	values[0] = XCB_STACK_MODE_ABOVE;
@@ -541,7 +672,6 @@ button_press(xcb_generic_event_t *event)
 			XCB_CONFIG_WINDOW_STACK_MODE,
 			values);
 
-	set_border(window, true);
 	update_bar();
 
 	geom = xcb_get_geometry_reply(connection,
@@ -577,9 +707,7 @@ enter_window(xcb_generic_event_t *event)
 {
 	xcb_enter_notify_event_t *e = (xcb_enter_notify_event_t *) event;
 
-	set_border(window, false);
-	window = e->event;
-	set_border(window, true);
+	update_current(e->event);
 	update_bar();
 
 	xcb_flush(connection);
@@ -588,6 +716,8 @@ enter_window(xcb_generic_event_t *event)
 void
 mouse_motion(xcb_generic_event_t *event)
 {
+	(void) event;
+
 	xcb_query_pointer_reply_t *pointer = xcb_query_pointer_reply(
 			connection,
 			xcb_query_pointer(connection, root),
@@ -607,7 +737,7 @@ mouse_motion(xcb_generic_event_t *event)
 	{
 	case 1: // Move
 	{
-		geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, window), NULL);
+		geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, current.frame), NULL);
 
 		values[0] = (pointer_x + geom->width > screen->width_in_pixels) ? (screen->width_in_pixels - geom->width) : pointer_x;
 		values[1] = (pointer_y + geom->height > screen->height_in_pixels) ? (screen->height_in_pixels - geom->height) : pointer_y;
@@ -615,12 +745,12 @@ mouse_motion(xcb_generic_event_t *event)
 		free(geom);
 
 		//printf("Move value: %d %d\n", values[0], values[1]);
-		xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+		xcb_configure_window(connection, current.frame, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
 		xcb_flush(connection);
 	} break;
 	case 3: // Resize
 	{
-		geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, window), NULL);
+		geom = xcb_get_geometry_reply(connection, xcb_get_geometry(connection, current.frame), NULL);
 
 		if ((pointer_x - geom->x) < MIN_WIDTH || (pointer_y - geom->y) < MIN_HEIGHT)
 		{
@@ -632,7 +762,8 @@ mouse_motion(xcb_generic_event_t *event)
 
 		free(geom);
 
-		xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+		frame_update_size(current.frame, values[0], values[1]);
+		//xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
 		xcb_flush(connection);
 	} break;
 	}
@@ -744,6 +875,81 @@ setup_randr(void)
 	free(screen_res_reply);
 }
 
+void
+setup_visual_type(void)
+{
+	for (xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);
+			depth_iter.rem;
+			xcb_depth_next(&depth_iter))
+	{
+		for (xcb_visualtype_iterator_t visual_iter = xcb_depth_visuals_iterator(depth_iter.data);
+				visual_iter.rem;
+				xcb_visualtype_next(&visual_iter))
+		{
+			if (screen->root_visual == visual_iter.data->visual_id)
+			{
+				visual_type = visual_iter.data;
+				return;
+			}
+		}
+	}
+}
+
+void
+unmap_notify(xcb_generic_event_t *event)
+{
+	xcb_unmap_notify_event_t *e = (xcb_unmap_notify_event_t *) event;
+
+#if 1
+	xcb_window_t frame = child_find_frame(e->window);
+
+	if (!frame)
+	{
+		return;
+	}
+#else
+	xcb_window_t frame = current.frame;
+	xcb_window_t window = current.id;
+
+	current.id = 0;
+	current.frame = 0;
+#endif
+
+	printf("unmap_notify: %d | frame: %d\n", e->window, frame);
+
+	xcb_unmap_window(connection, frame);
+
+	xcb_reparent_window(connection, e->window, root, 0, 0);
+
+	xcb_destroy_window(connection, e->window);
+}
+
+void
+cleanup(void)
+{
+	xcb_free_gc(connection, bar_gc);
+	text_render_destroy();
+	xcb_key_symbols_free(syms);
+	xcb_set_input_focus(connection, XCB_NONE,
+			XCB_INPUT_FOCUS_POINTER_ROOT,
+			XCB_CURRENT_TIME);
+
+	for (uint32_t i = 0; i < windows_len; ++i)
+	{
+		xcb_kill_client(connection, windows[i].id);
+
+		xcb_unmap_window(connection, windows[i].frame);
+		xcb_destroy_window(connection, windows[i].frame);
+	}
+
+	xcb_unmap_window(connection, bar);
+	xcb_destroy_window(connection, bar);
+
+	xcb_flush(connection);
+	xcb_disconnect(connection);
+	printf("Closing martwm\n");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -752,6 +958,7 @@ main(int argc, char **argv)
 
 	printf("Running martwm\n");
 
+	atexit(cleanup);
 	connection = xcb_connect(NULL, NULL);
 	if (xcb_connection_has_error(connection))
 	{
@@ -816,14 +1023,13 @@ main(int argc, char **argv)
 	setup_overview();
 	setup_bar();
 
-	xcb_flush(connection);
-
 	uint32_t root_values[1] = {
 		XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		| XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
 		| XCB_EVENT_MASK_PROPERTY_CHANGE
 		| XCB_EVENT_MASK_BUTTON_PRESS
 	};
+	setup_visual_type();
 
 	xcb_generic_error_t *error = xcb_request_check(connection,
 			xcb_change_window_attributes_checked(connection, root,
@@ -833,8 +1039,12 @@ main(int argc, char **argv)
 	{
 		fprintf(stderr, "ERROR Cannot set root window attributes\n");
 		free(error);
-		goto exit_wm;
+		exit(1);
 	}
+
+	text_render_setup();
+
+	xcb_flush(connection);
 
 	xcb_generic_event_t 	*ev = NULL;
 	void			(*events[XCB_NO_OPERATION])(xcb_generic_event_t *) = {
@@ -844,13 +1054,13 @@ main(int argc, char **argv)
 		[XCB_BUTTON_PRESS] = button_press,
 		[XCB_ENTER_NOTIFY] = enter_window,
 		[XCB_MOTION_NOTIFY] = mouse_motion,
-		[XCB_BUTTON_RELEASE] = button_release
+		[XCB_BUTTON_RELEASE] = button_release,
+		[XCB_UNMAP_NOTIFY] = unmap_notify
 
-		//events[XCB_DESTROY_NOTIFY] = ,
-		//events[XCB_UNMAP_NOTIFY] = ,
-		//events[XCB_CONFIGURE_REQUEST] = ,
-		//events[XCB_CONFIGURE_NOTIFY] = ,
-		//events[XCB_CLIENT_MESSAGE] = ,
+		//[XCB_DESTROY_NOTIFY] = ,
+		//[XCB_CONFIGURE_REQUEST] = ,
+		//[XCB_CONFIGURE_NOTIFY] = ,
+		//[XCB_CLIENT_MESSAGE] = ,
 	};
 
 	running = true;
@@ -865,19 +1075,7 @@ main(int argc, char **argv)
 		free(ev);
 	}
 
-exit_wm:
-	xcb_key_symbols_free(syms);
-	xcb_set_input_focus(connection, XCB_NONE,
-			XCB_INPUT_FOCUS_POINTER_ROOT,
-			XCB_CURRENT_TIME);
-
-	xcb_unmap_window(connection, bar);
-	xcb_destroy_window(connection, bar);
-
-	xcb_flush(connection);
-	xcb_disconnect(connection);
-	printf("Closing martwm\n");
-
-	return 0;
+	exit(0);
 }
+
 

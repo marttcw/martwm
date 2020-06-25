@@ -1,0 +1,210 @@
+==91206== Memcheck, a memory error detector
+==91206== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==91206== Using Valgrind-3.16.0.GIT and LibVEX; rerun with -h for copyright info
+==91206== Command: ./martwm
+==91206== Parent PID: 60242
+==91206== 
+==91206== 
+==91206== HEAP SUMMARY:
+==91206==     in use at exit: 49,244 bytes in 238 blocks
+==91206==   total heap usage: 363 allocs, 125 frees, 87,055 bytes allocated
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 89 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EFB7: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C755: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 90 of 238
+==91206==    at 0x48396AF: malloc (vg_replace_malloc.c:306)
+==91206==    by 0x49C4728: g_realloc (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EF3D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C755: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 91 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EFB7: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C7B4: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 92 of 238
+==91206==    at 0x48396AF: malloc (vg_replace_malloc.c:306)
+==91206==    by 0x49C4728: g_realloc (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EF3D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C7B4: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 93 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EFB7: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C87C: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 94 of 238
+==91206==    at 0x48396AF: malloc (vg_replace_malloc.c:306)
+==91206==    by 0x49C4728: g_realloc (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EF3D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C87C: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 95 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EFB7: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492D910: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 16 bytes in 1 blocks are possibly lost in loss record 96 of 238
+==91206==    at 0x48396AF: malloc (vg_replace_malloc.c:306)
+==91206==    by 0x49C4728: g_realloc (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494EF3D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6CF: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492D910: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 96 bytes in 1 blocks are possibly lost in loss record 212 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x49430A8: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x4943EEE: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C005: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 96 bytes in 1 blocks are possibly lost in loss record 213 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x49430A8: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x4943EEE: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6C1: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C755: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 96 bytes in 1 blocks are possibly lost in loss record 214 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x49430A8: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x4943EEE: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6C1: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C7B4: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 96 bytes in 1 blocks are possibly lost in loss record 215 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x49430A8: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x4943EEE: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6C1: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C87C: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 96 bytes in 1 blocks are possibly lost in loss record 216 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x49430A8: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x4943EEE: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F6C1: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492D910: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 132 bytes in 1 blocks are possibly lost in loss record 218 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x4944E6D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F749: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C755: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 132 bytes in 1 blocks are possibly lost in loss record 219 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x4944E6D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F749: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C7B4: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 148 bytes in 1 blocks are possibly lost in loss record 220 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x4944C6D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F749: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C87C: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 148 bytes in 1 blocks are possibly lost in loss record 221 of 238
+==91206==    at 0x483BB65: calloc (vg_replace_malloc.c:760)
+==91206==    by 0x49C4591: g_malloc0 (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x4944C6D: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x494F749: g_type_register_fundamental (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492D910: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== 184 bytes in 1 blocks are possibly lost in loss record 223 of 238
+==91206==    at 0x483BD7B: realloc (vg_replace_malloc.c:834)
+==91206==    by 0x49C4728: g_realloc (in /usr/lib/libglib-2.0.so.0.6400.3)
+==91206==    by 0x494301F: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x495443C: g_type_register_static (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x49419A2: g_param_type_register_static (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492BE67: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x492C96C: ??? (in /usr/lib/libgobject-2.0.so.0.6400.3)
+==91206==    by 0x40110F1: call_init.part.0 (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4011200: _dl_init (in /usr/lib/ld-2.31.so)
+==91206==    by 0x4002139: ??? (in /usr/lib/ld-2.31.so)
+==91206== 
+==91206== LEAK SUMMARY:
+==91206==    definitely lost: 0 bytes in 0 blocks
+==91206==    indirectly lost: 0 bytes in 0 blocks
+==91206==      possibly lost: 1,352 bytes in 18 blocks
+==91206==    still reachable: 47,892 bytes in 220 blocks
+==91206==                       of which reachable via heuristic:
+==91206==                         newarray           : 1,536 bytes in 16 blocks
+==91206==         suppressed: 0 bytes in 0 blocks
+==91206== Reachable blocks (those to which a pointer was found) are not shown.
+==91206== To see them, rerun with: --leak-check=full --show-leak-kinds=all
+==91206== 
+==91206== For lists of detected and suppressed errors, rerun with: -s
+==91206== ERROR SUMMARY: 18 errors from 18 contexts (suppressed: 0 from 0)

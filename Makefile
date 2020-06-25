@@ -8,18 +8,20 @@ PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
 LINKS = -lxcb -lxcb-randr -lxcb-keysyms
 INCLUDES = -Isrc
-CFLAGS = -std=c99 -pedantic-errors -pedantic -Wall -msse2 -Wpointer-arith -Wstrict-prototypes -fomit-frame-pointer -ffast-math
+PKG = pangocairo
+PKG_CFG = `pkg-config --libs --cflags ${PKG}`
+CFLAGS = -std=c99 -pedantic-errors -pedantic -Wall -Wextra -msse2 -Wpointer-arith -Wstrict-prototypes -fomit-frame-pointer -ffast-math
 CFLAGS_RELEASE = -flto -Os
 CFLAGS_DEBUG = -g
 OTHER_FILES = LICENSE Makefile README.md
 
 ${NAME}: ${SRC}
 	@echo make release build
-	@${CC} -o ${NAME} ${LINKS} ${INCLUDES} ${CFLAGS} ${CFLAGS_RELEASE} ${SRC}
+	@${CC} -o ${NAME} ${LINKS} ${INCLUDES} ${CFLAGS} ${PKG_CFG} ${CFLAGS_RELEASE} ${SRC}
 
 debug:
 	@echo make debug build
-	@${CC} -o ${NAME} ${LINKS} ${INCLUDES} ${CFLAGS} ${CFLAGS_DEBUG} ${SRC}
+	@${CC} -o ${NAME} ${LINKS} ${INCLUDES} ${CFLAGS} ${PKG_CFG} ${CFLAGS_DEBUG} ${SRC}
 
 clean:
 	@echo cleaning
